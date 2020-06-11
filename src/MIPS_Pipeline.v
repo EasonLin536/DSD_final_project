@@ -1,21 +1,21 @@
 module MIPS_Pipeline(
-		// control interface
-		clk           , 
-		rst_n         ,
+	// control interface
+	clk           , 
+	rst_n         ,
 //----------I cache interface-------		
-		ICACHE_ren    ,
-		ICACHE_wen    ,
-		ICACHE_addr   ,
-		ICACHE_wdata  ,
-		ICACHE_stall  ,
-		ICACHE_rdata  ,
+	ICACHE_ren    ,
+	ICACHE_wen    ,
+	ICACHE_addr   ,
+	ICACHE_wdata  ,
+	ICACHE_stall  ,
+	ICACHE_rdata  ,
 //----------D cache interface-------
-		DCACHE_ren    ,
-		DCACHE_wen    ,
-		DCACHE_addr   ,
-		DCACHE_wdata  ,
-		DCACHE_stall  ,
-		DCACHE_rdata
+	DCACHE_ren    ,
+	DCACHE_wen    ,
+	DCACHE_addr   ,
+	DCACHE_wdata  ,
+	DCACHE_stall  ,
+	DCACHE_rdata
 );
 //==== io Declaration =========================
     input         clk;
@@ -82,8 +82,8 @@ module MIPS_Pipeline(
     reg  [31:0] extended_instr_5_EX;
     wire [31:0] extended_shift2;
     // ALU input
-    wire [31:0] alu_in_1, alu_in_2;
-    wire [31:0] alu_orig_in_1, alu_orig_in_2;
+    wire [31:0] alu_in_0, alu_in_1;
+    wire [31:0] alu_orig_in_0, alu_orig_in_1;
     // ALU output
     wire        Zero_EX;
     reg         Zero_MEM;
@@ -236,8 +236,8 @@ module MIPS_Pipeline(
                               .Jalr(Jalr_EX)
     );
     ALU ALU_1(.ctrl(ALUCtrl),
-              .in_0(alu_in_1),
-              .in_1(alu_in_2),
+              .in_0(alu_in_0),
+              .in_1(alu_in_1),
               .result(ALU_result_EX),
               .Zero(Zero_EX)
     );
@@ -245,7 +245,7 @@ module MIPS_Pipeline(
 //==== Sequential Part ========================
     // ==== stage IF  ====
     always @(posedge clk) begin
-        if(!rst_n) begin
+        if (!rst_n) begin
             PC_r <= 0;
         end
         else begin
@@ -254,148 +254,148 @@ module MIPS_Pipeline(
     end
     // ==== stage ID  ====
     always @(posedge clk) begin
-        if(!rst_n | ((Jump_ID | JumpReg_EX | PCsrc) & ~(ICACHE_stall | DCACHE_stall))) begin
-            PC_ID <= 0;
-            PC_plus4_ID <= 0;
+        if (!rst_n | ((Jump_ID | JumpReg_EX | PCsrc) & ~(ICACHE_stall | DCACHE_stall))) begin
+            PC_ID          <= 0;
+            PC_plus4_ID    <= 0;
             instruction_ID <= 0;
         end
-        else if(ICACHE_stall | DCACHE_stall | ~IF_ID_write) begin
-            PC_ID <= PC_ID_old;
-            PC_plus4_ID <= PC_plus4_ID_old;
+        else if (ICACHE_stall | DCACHE_stall | ~IF_ID_write) begin
+            PC_ID          <= PC_ID_old;
+            PC_plus4_ID    <= PC_plus4_ID_old;
             instruction_ID <= instruction_ID_old;
         end
         else begin
-            PC_ID <= PC_r;
-            PC_plus4_ID <= PC_plus4_IF;
+            PC_ID          <= PC_r;
+            PC_plus4_ID    <= PC_plus4_IF;
             instruction_ID <= instruction_IF;
         end
     end
     // ==== stage EX  ====
     always @(posedge clk) begin
-        if(!rst_n | ((JumpReg_EX | PCsrc) & ~(ICACHE_stall | DCACHE_stall))) begin
-            PC_EX <= 0;
-            instruction_EX <= 0;
-            PC_plus4_EX <= 0;
-            RegDst_EX <= 0;
-            Branch_EX <= 0;
-            MemRead_EX <= 0;
-            MemtoReg_EX <= 0;
-            ALUOp_EX <= 0;
-            MemWrite_EX <= 0;
-            ALUSrc_EX <= 0;
-            RegWrite_EX <= 0;
-            Jal_EX <= 0;
-            ExtOp_EX <= 0;
+        if (!rst_n | ((JumpReg_EX | PCsrc) & ~(ICACHE_stall | DCACHE_stall))) begin
+            PC_EX               <= 0;
+            instruction_EX      <= 0;
+            PC_plus4_EX         <= 0;
+            RegDst_EX           <= 0;
+            Branch_EX           <= 0;
+            MemRead_EX          <= 0;
+            MemtoReg_EX         <= 0;
+            ALUOp_EX            <= 0;
+            MemWrite_EX         <= 0;
+            ALUSrc_EX           <= 0;
+            RegWrite_EX         <= 0;
+            Jal_EX              <= 0;
+            ExtOp_EX            <= 0;
 
-            PC_plus4_EX <= 0;
-            ReadData1_EX <= 0;
-            ReadData2_EX <= 0;
+            PC_plus4_EX         <= 0;
+            ReadData1_EX        <= 0;
+            ReadData2_EX        <= 0;
             extended_instr_5_EX <= 0;
-            instr_2_EX <= 0;
-            instr_3_EX <= 0;
-            instr_4_EX <= 0;
+            instr_2_EX          <= 0;
+            instr_3_EX          <= 0;
+            instr_4_EX          <= 0;
         end
         else if(ICACHE_stall | DCACHE_stall) begin
-            PC_EX <= PC_EX_old;
-            instruction_EX <= instruction_EX_old;
-            PC_plus4_EX <= PC_plus4_EX_old;
-            RegDst_EX <= RegDst_EX_old;
-            Branch_EX <= Branch_EX_old;
-            MemRead_EX <= MemRead_EX_old;
-            MemtoReg_EX <= MemtoReg_EX_old;
-            ALUOp_EX <= ALUOp_EX_old;
-            MemWrite_EX <= MemWrite_EX_old;
-            ALUSrc_EX <= ALUSrc_EX_old;
-            RegWrite_EX <= RegWrite_EX_old;
-            Jal_EX <= Jal_EX_old;
-            ExtOp_EX <= ExtOp_EX_old;
+            PC_EX               <= PC_EX_old;
+            instruction_EX      <= instruction_EX_old;
+            PC_plus4_EX         <= PC_plus4_EX_old;
+            RegDst_EX           <= RegDst_EX_old;
+            Branch_EX           <= Branch_EX_old;
+            MemRead_EX          <= MemRead_EX_old;
+            MemtoReg_EX         <= MemtoReg_EX_old;
+            ALUOp_EX            <= ALUOp_EX_old;
+            MemWrite_EX         <= MemWrite_EX_old;
+            ALUSrc_EX           <= ALUSrc_EX_old;
+            RegWrite_EX         <= RegWrite_EX_old;
+            Jal_EX              <= Jal_EX_old;
+            ExtOp_EX            <= ExtOp_EX_old;
 
-            PC_plus4_EX <= PC_plus4_EX_old;
-            ReadData1_EX <= ReadData1_EX_old;
-            ReadData2_EX <= ReadData2_EX_old;
+            PC_plus4_EX         <= PC_plus4_EX_old;
+            ReadData1_EX        <= ReadData1_EX_old;
+            ReadData2_EX        <= ReadData2_EX_old;
             extended_instr_5_EX <= extended_instr_5_EX_old;
-            instr_2_EX <= instr_2_EX_old;
-            instr_3_EX <= instr_3_EX_old; // read reg 2 / write reg
-            instr_4_EX <= instr_4_EX_old; // write reg
+            instr_2_EX          <= instr_2_EX_old;
+            instr_3_EX          <= instr_3_EX_old; // read reg 2 / write reg
+            instr_4_EX          <= instr_4_EX_old; // write reg
         end
         else begin
-            PC_EX <= PC_ID;
-            instruction_EX <= instruction_ID;
-            PC_plus4_EX <= PC_plus4_ID;
-            RegDst_EX <= RegDst_ID;
-            Branch_EX <= Branch_ID;
-            MemRead_EX <= MemRead_ID;
-            MemtoReg_EX <= MemtoReg_ID;
-            ALUOp_EX <= ALUOp_ID;
-            MemWrite_EX <= MemWrite_ID;
-            ALUSrc_EX <= ALUSrc_ID;
-            RegWrite_EX <= RegWrite_ID;
-            Jal_EX <= Jal_ID;
-            ExtOp_EX <= ExtOp_ID;
+            PC_EX               <= PC_ID;
+            instruction_EX      <= instruction_ID;
+            PC_plus4_EX         <= PC_plus4_ID;
+            RegDst_EX           <= RegDst_ID;
+            Branch_EX           <= Branch_ID;
+            MemRead_EX          <= MemRead_ID;
+            MemtoReg_EX         <= MemtoReg_ID;
+            ALUOp_EX            <= ALUOp_ID;
+            MemWrite_EX         <= MemWrite_ID;
+            ALUSrc_EX           <= ALUSrc_ID;
+            RegWrite_EX         <= RegWrite_ID;
+            Jal_EX              <= Jal_ID;
+            ExtOp_EX            <= ExtOp_ID;
 
-            PC_plus4_EX <= PC_plus4_ID;
-            ReadData1_EX <= ReadData1_ID;
-            ReadData2_EX <= ReadData2_ID;
+            PC_plus4_EX         <= PC_plus4_ID;
+            ReadData1_EX        <= ReadData1_ID;
+            ReadData2_EX        <= ReadData2_ID;
             extended_instr_5_EX <= extended_instr_5_ID;
-            instr_2_EX <= instr_2_ID;
-            instr_3_EX <= instr_3_ID; // read reg 2 / write reg
-            instr_4_EX <= instr_4_ID; // write reg
+            instr_2_EX          <= instr_2_ID;
+            instr_3_EX          <= instr_3_ID; // read reg 2 / write reg
+            instr_4_EX          <= instr_4_ID; // write reg
         end
     end
     // ==== stage MEM ====
     always @(posedge clk) begin
-        if(!rst_n | (PCsrc & ~(ICACHE_stall | DCACHE_stall))) begin
-            PC_MEM <= 0;
-            instruction_MEM <= 0;
-            PC_plus4_MEM <= 0;
-            Branch_MEM <= 0;
-            MemRead_MEM <= 0;
-            MemtoReg_MEM <= 0;
-            MemWrite_MEM <= 0;
-            RegWrite_MEM <= 0;
-            Jal_MEM <= 0;
-            Jalr_MEM <= 0;
+        if (!rst_n | (PCsrc & ~(ICACHE_stall | DCACHE_stall))) begin
+            PC_MEM             <= 0;
+            instruction_MEM    <= 0;
+            PC_plus4_MEM       <= 0;
+            Branch_MEM         <= 0;
+            MemRead_MEM        <= 0;
+            MemtoReg_MEM       <= 0;
+            MemWrite_MEM       <= 0;
+            RegWrite_MEM       <= 0;
+            Jal_MEM            <= 0;
+            Jalr_MEM           <= 0;
             
-            PC_add_imm_MEM <= 0;
-            Zero_MEM <= 0;
-            ALU_result_MEM <= 0;
-            ReadData2_MEM <= 0;
+            PC_add_imm_MEM     <= 0;
+            Zero_MEM           <= 0;
+            ALU_result_MEM     <= 0;
+            ReadData2_MEM      <= 0;
             WriteFromInstr_MEM <= 0;
         end
-        else if(ICACHE_stall | DCACHE_stall) begin
-            PC_MEM <= PC_MEM_old;
-            instruction_MEM <= instruction_MEM_old;
-            PC_plus4_MEM <= PC_plus4_MEM_old;
-            Branch_MEM <= Branch_MEM_old;
-            MemRead_MEM <= MemRead_MEM_old;
-            MemtoReg_MEM <= MemtoReg_MEM_old;
-            MemWrite_MEM <= MemWrite_MEM_old;
-            RegWrite_MEM <= RegWrite_MEM_old;
-            Jal_MEM <= Jal_MEM_old;
-            Jalr_MEM <= Jalr_MEM_old;
+        else if (ICACHE_stall | DCACHE_stall) begin
+            PC_MEM             <= PC_MEM_old;
+            instruction_MEM    <= instruction_MEM_old;
+            PC_plus4_MEM       <= PC_plus4_MEM_old;
+            Branch_MEM         <= Branch_MEM_old;
+            MemRead_MEM        <= MemRead_MEM_old;
+            MemtoReg_MEM       <= MemtoReg_MEM_old;
+            MemWrite_MEM       <= MemWrite_MEM_old;
+            RegWrite_MEM       <= RegWrite_MEM_old;
+            Jal_MEM            <= Jal_MEM_old;
+            Jalr_MEM           <= Jalr_MEM_old;
 
-            PC_add_imm_MEM <= PC_add_imm_MEM_old;
-            Zero_MEM <= Zero_MEM_old;
-            ALU_result_MEM <= ALU_result_MEM_old;
-            ReadData2_MEM <= ReadData2_MEM_old;
+            PC_add_imm_MEM     <= PC_add_imm_MEM_old;
+            Zero_MEM           <= Zero_MEM_old;
+            ALU_result_MEM     <= ALU_result_MEM_old;
+            ReadData2_MEM      <= ReadData2_MEM_old;
             WriteFromInstr_MEM <= WriteFromInstr_MEM_old;
         end
         else begin
-            PC_MEM <= PC_EX;
-            instruction_MEM <= instruction_EX;
-            PC_plus4_MEM <= PC_plus4_EX;
-            Branch_MEM <= Branch_EX;
-            MemRead_MEM <= MemRead_EX;
-            MemtoReg_MEM <= MemtoReg_EX;
-            MemWrite_MEM <= MemWrite_EX;
-            RegWrite_MEM <= RegWrite_EX;
-            Jal_MEM <= Jal_EX;
-            Jalr_MEM <= Jalr_EX;
+            PC_MEM             <= PC_EX;
+            instruction_MEM    <= instruction_EX;
+            PC_plus4_MEM       <= PC_plus4_EX;
+            Branch_MEM         <= Branch_EX;
+            MemRead_MEM        <= MemRead_EX;
+            MemtoReg_MEM       <= MemtoReg_EX;
+            MemWrite_MEM       <= MemWrite_EX;
+            RegWrite_MEM       <= RegWrite_EX;
+            Jal_MEM            <= Jal_EX;
+            Jalr_MEM           <= Jalr_EX;
 
-            PC_add_imm_MEM <= PC_add_imm_EX;
-            Zero_MEM <= Zero_EX;
-            ALU_result_MEM <= ALU_result_EX;
-            ReadData2_MEM <= ReadData2_EX;
+            PC_add_imm_MEM     <= PC_add_imm_EX;
+            Zero_MEM           <= Zero_EX;
+            ALU_result_MEM     <= ALU_result_EX;
+            ReadData2_MEM      <= ReadData2_EX;
             WriteFromInstr_MEM <= WriteFromInstr_EX;
         end
     end
@@ -445,9 +445,9 @@ module MIPS_Pipeline(
     // ==== stage IF  ====
     // PC wire
     assign PC_plus4_IF = PC_r + 4;
-    assign jump_addr = {PC_plus4_ID[31:28], instr_0_ID, 2'b00};
+    assign jump_addr = { PC_plus4_ID[31:28], instr_0_ID, 2'b00 };
     assign if_jump = (Jump_ID)? jump_addr : PC_plus4_IF; // MUX
-    assign if_jr = (JumpReg_EX)? alu_in_1 : if_jump; // MUX
+    assign if_jr = (JumpReg_EX)? alu_in_0 : if_jump; // MUX
     assign if_branch = (PCsrc)? PC_add_imm_MEM : if_jr; // MUX
     assign PC_w = (ICACHE_stall | DCACHE_stall | ~PCWrite)? PC_r : if_branch;
 	// Instruction Fetch
@@ -474,13 +474,13 @@ module MIPS_Pipeline(
     assign extended_shift2 = {extended_instr_5_EX[29:0], 2'b00};
     assign PC_add_imm_EX = PC_plus4_EX + extended_shift2;
     // ALU input
-    assign alu_orig_in_1 = (Shift_EX)? {27'b0, extended_instr_5_EX[10:6]} : ReadData1_EX;
-    assign alu_orig_in_2 = (ALUSrc_EX)? extended_instr_5_EX : ReadData2_EX; // MUX
+    assign alu_orig_in_0 = (Shift_EX)? {27'b0, extended_instr_5_EX[10:6]} : ReadData1_EX;
+    assign alu_orig_in_1 = (ALUSrc_EX)? extended_instr_5_EX : ReadData2_EX; // MUX
     // Hazard Handling
-    assign alu_in_1 = (ForwardA[0])? WriteData :
-                      (ForwardA[1])? ALU_result_MEM : alu_orig_in_1;
-    assign alu_in_2 = (ForwardB[0] && ~ALUSrc_EX)? WriteData : // if imm, don't forwarding
-                      (ForwardB[1] && ~ALUSrc_EX)? ALU_result_MEM : alu_orig_in_2;
+    assign alu_in_0 = (ForwardA[0])? WriteData :
+                      (ForwardA[1])? ALU_result_MEM : alu_orig_in_0;
+    assign alu_in_1 = (ForwardB[0] && ~ALUSrc_EX)? WriteData : // if imm, don't forwarding
+                      (ForwardB[1] && ~ALUSrc_EX)? ALU_result_MEM : alu_orig_in_1;
     // ==== stage MEM ====
     // Branch
     assign PCsrc = Branch_MEM & Zero_MEM;

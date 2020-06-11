@@ -1,14 +1,17 @@
-module ALU(ctrl, 
-           in_0, 
-           in_1,
-           result,
-           Zero
-    );
+module ALU(
+    ctrl, 
+    in_0, 
+    in_1,
+    result,
+    Zero
+);
+//==== io Declaration =========================
     input       [3:0] ctrl;
     input      [31:0] in_0, in_1;
     output reg [31:0] result;
     output reg        Zero;
-    always@(*) begin
+    
+    always @(*) begin
         case(ctrl)
             4'b0000: begin // and
                 result = in_0 & in_1;

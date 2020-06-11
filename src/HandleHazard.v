@@ -7,7 +7,7 @@ module HazardDetection(
     if_id_Write,
     mux_Ctrl
 );
-
+//==== io Declaration =========================
     input            id_ex_MemRead;
     input      [4:0] id_ex_rt, if_id_rs, if_id_rt;
     output reg       PCWrite, if_id_Write;
