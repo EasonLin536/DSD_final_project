@@ -46,7 +46,7 @@ module cache(
     reg    [127:0] mem_wdata, next_mem_wdata;
     // state, cache
     reg    [155:0] cache_dm[0:3][0:1], next_cache_dm[0:3][0:1];
-    reg      [7:0] LRU, next_LRU;
+    reg      [3:0] LRU, next_LRU;
     reg      [2:0] state, next_state;
     // proc addr
     wire     [1:0] index;
@@ -58,7 +58,6 @@ module cache(
     // COMPARE
     wire           hit[0:1];
     wire     [1:0] word_idx;
-
 //==== combinational circuit ==============================
     // io proc
     // io mem
@@ -77,25 +76,22 @@ module cache(
     assign hit[1] = (tag == cache_tag[1]);
     assign word_idx = proc_addr[1:0];
     integer i;
-    
-    always @(*) begin
-        for (i = 0; i < 4; i = i + 1) begin
+    always@(*) begin
+        for(i = 0; i < 4; i = i + 1) begin
             next_cache_dm[i][0] = cache_dm[i][0];
             next_cache_dm[i][1] = cache_dm[i][1];
         end
-        
-        next_LRU       = LRU;
-        next_state     = state;
-        proc_stall     = 0;
-        proc_rdata     = 0;
-        mem_read       = 0;
-        mem_write      = 0;
-        next_mem_addr  = mem_addr;
+        next_LRU = LRU;
+        next_state = state;
+        proc_stall = 0;
+        proc_rdata = 0;
+        mem_read = 0;
+        mem_write = 0;
+        next_mem_addr = mem_addr;
         next_mem_wdata = mem_wdata;
-        
         case(state)
             IDLE: begin
-                if (!proc_reset) begin
+                if(!proc_reset) begin
                     next_state = COMPARE;
                 end
                 else begin
@@ -103,7 +99,7 @@ module cache(
                 end
             end
             COMPARE: begin
-                if (valid[0] && hit[0]) begin // cache hit 0
+                if(valid[0] && hit[0]) begin // cache hit 0
                     next_LRU[index] = 1;
                     next_state = COMPARE;
                     if(proc_read) begin
@@ -123,7 +119,7 @@ module cache(
                             default: proc_rdata = 0;
                         endcase
                     end
-                    else if (proc_write) begin
+                    else if(proc_write) begin
                         next_cache_dm[index][0][155] = 1; // set dirty
                         case(word_idx)
                             2'b00: begin
@@ -253,7 +249,7 @@ module cache(
     end
     //==== sequential circuit =================================
     integer j;
-    always@( posedge clk or negedge proc_reset) begin
+    always@( posedge clk or posedge proc_reset) begin
         if( proc_reset ) begin
             for(j = 0; j < 4; j = j + 1) begin
                 cache_dm[j][0] <= 0;
@@ -277,4 +273,5 @@ module cache(
             mem_wdata <= next_mem_wdata;
         end
     end
+
 endmodule
