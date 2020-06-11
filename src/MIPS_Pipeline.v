@@ -83,7 +83,7 @@ module MIPS_Pipeline(
     wire [31:0] extended_shift2;
     // ALU input
     wire [31:0] alu_in_0, alu_in_1;
-    wire [31:0] alu_orig_in_0, alu_orig_in_1;
+    wire [31:0] alu_orig_in_0;
     // ALU output
     wire        Zero_EX;
     reg         Zero_MEM;
@@ -475,12 +475,9 @@ module MIPS_Pipeline(
     assign PC_add_imm_EX = PC_plus4_EX + extended_shift2;
     // ALU input
     assign alu_orig_in_0 = (Shift_EX)? {27'b0, extended_instr_5_EX[10:6]} : ReadData1_EX;
-    assign alu_orig_in_1 = (ALUSrc_EX)? extended_instr_5_EX : ReadData2_EX; // MUX
     // Hazard Handling
     assign alu_in_0 = (ForwardA[0])? WriteData :
                       (ForwardA[1])? ALU_result_MEM : alu_orig_in_0;
-    // assign alu_in_1 = (ForwardB[0] && ~ALUSrc_EX)? WriteData : // if imm, don't forwarding
-    //                   (ForwardB[1] && ~ALUSrc_EX)? ALU_result_MEM : alu_orig_in_1;
     assign alu_in_1 = (ALUSrc_EX)?   extended_instr_5_EX :
                       (ForwardB[0])? WriteData :
                       (ForwardB[1])? ALU_result_MEM : ReadData2_EX;
