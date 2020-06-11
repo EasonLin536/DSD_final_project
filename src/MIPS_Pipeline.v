@@ -401,43 +401,43 @@ module MIPS_Pipeline(
     end
     // ==== stage WB  ====
     always @(posedge clk) begin
-        if(!rst_n) begin
-            PC_WB <= 0;
-            instruction_WB <= 0;
-            PC_plus4_WB <= 0;
-            MemtoReg_WB <= 0;
-            RegWrite_WB <= 0;
-            Jal_WB <= 0;
-            Jalr_WB <= 0;
+        if (!rst_n) begin
+            PC_WB             <= 0;
+            instruction_WB    <= 0;
+            PC_plus4_WB       <= 0;
+            MemtoReg_WB       <= 0;
+            RegWrite_WB       <= 0;
+            Jal_WB            <= 0;
+            Jalr_WB           <= 0;
 
-            rdata_D_WB <= 0;
-            ALU_result_WB <= 0;
+            rdata_D_WB        <= 0;
+            ALU_result_WB     <= 0;
             WriteFromInstr_WB <= 0;
         end
-        else if(ICACHE_stall | DCACHE_stall) begin
-            PC_WB <= PC_WB_old;
-            instruction_WB <= instruction_WB_old;
-            PC_plus4_WB <= PC_plus4_WB_old;
-            MemtoReg_WB <= MemtoReg_WB_old;
-            RegWrite_WB <= RegWrite_WB_old;
-            Jal_WB <= Jal_WB_old;
-            Jalr_WB <= Jalr_WB_old;
+        else if (ICACHE_stall | DCACHE_stall) begin
+            PC_WB             <= PC_WB_old;
+            instruction_WB    <= instruction_WB_old;
+            PC_plus4_WB       <= PC_plus4_WB_old;
+            MemtoReg_WB       <= MemtoReg_WB_old;
+            RegWrite_WB       <= RegWrite_WB_old;
+            Jal_WB            <= Jal_WB_old;
+            Jalr_WB           <= Jalr_WB_old;
 
-            rdata_D_WB <= rdata_D_WB_old;
-            ALU_result_WB <= ALU_result_WB_old;
+            rdata_D_WB        <= rdata_D_WB_old;
+            ALU_result_WB     <= ALU_result_WB_old;
             WriteFromInstr_WB <= WriteFromInstr_WB_old;
         end
         else begin
-            PC_WB <= PC_MEM;
-            instruction_WB <= instruction_MEM;
-            PC_plus4_WB <= PC_plus4_MEM;
-            MemtoReg_WB <= MemtoReg_MEM;
-            RegWrite_WB <= RegWrite_MEM;
-            Jal_WB <= Jal_MEM;
-            Jalr_WB <= Jalr_MEM;
+            PC_WB             <= PC_MEM;
+            instruction_WB    <= instruction_MEM;
+            PC_plus4_WB       <= PC_plus4_MEM;
+            MemtoReg_WB       <= MemtoReg_MEM;
+            RegWrite_WB       <= RegWrite_MEM;
+            Jal_WB            <= Jal_MEM;
+            Jalr_WB           <= Jalr_MEM;
 
-            rdata_D_WB <= rdata_D_MEM;
-            ALU_result_WB <= ALU_result_MEM;
+            rdata_D_WB        <= rdata_D_MEM;
+            ALU_result_WB     <= ALU_result_MEM;
             WriteFromInstr_WB <= WriteFromInstr_MEM;
         end
     end
@@ -445,17 +445,17 @@ module MIPS_Pipeline(
     // ==== stage IF  ====
     // PC wire
     assign PC_plus4_IF = PC_r + 4;
-    assign jump_addr = { PC_plus4_ID[31:28], instr_0_ID, 2'b00 };
-    assign if_jump = (Jump_ID)? jump_addr : PC_plus4_IF; // MUX
-    assign if_jr = (JumpReg_EX)? alu_in_0 : if_jump; // MUX
-    assign if_branch = (PCsrc)? PC_add_imm_MEM : if_jr; // MUX
-    assign PC_w = (ICACHE_stall | DCACHE_stall | ~PCWrite)? PC_r : if_branch;
+    assign jump_addr   = { PC_plus4_ID[31:28], instr_0_ID, 2'b00 };
+    assign if_jump     = (Jump_ID)? jump_addr : PC_plus4_IF; // MUX
+    assign if_jr       = (JumpReg_EX)? alu_in_0 : if_jump; // MUX
+    assign if_branch   = (PCsrc)? PC_add_imm_MEM : if_jr; // MUX
+    assign PC_w        = (ICACHE_stall | DCACHE_stall | ~PCWrite)? PC_r : if_branch;
 	// Instruction Fetch
-	assign ICACHE_ren = 1'b1;
-    assign ICACHE_wen = 1'b0;
-    assign ICACHE_addr = PC_r[31:2];
+	assign ICACHE_ren     = 1'b1;
+    assign ICACHE_wen     = 1'b0;
+    assign ICACHE_addr    = PC_r[31:2];
     assign instruction_IF = ICACHE_rdata;
-    assign ICACHE_wdata = 0;
+    assign ICACHE_wdata   = 0;
     // ==== stage ID  ====
     // Instruction memory output
     assign instr_0_ID = instruction_ID[25:0];  // PC shift left 2
@@ -479,8 +479,11 @@ module MIPS_Pipeline(
     // Hazard Handling
     assign alu_in_0 = (ForwardA[0])? WriteData :
                       (ForwardA[1])? ALU_result_MEM : alu_orig_in_0;
-    assign alu_in_1 = (ForwardB[0] && ~ALUSrc_EX)? WriteData : // if imm, don't forwarding
-                      (ForwardB[1] && ~ALUSrc_EX)? ALU_result_MEM : alu_orig_in_1;
+    // assign alu_in_1 = (ForwardB[0] && ~ALUSrc_EX)? WriteData : // if imm, don't forwarding
+    //                   (ForwardB[1] && ~ALUSrc_EX)? ALU_result_MEM : alu_orig_in_1;
+    assign alu_in_1 = (ALUSrc_EX)?   extended_instr_5_EX :
+                      (ForwardB[0])? WriteData :
+                      (ForwardB[1])? ALU_result_MEM : ReadData2_EX;
     // ==== stage MEM ====
     // Branch
     assign PCsrc = Branch_MEM & Zero_MEM;
