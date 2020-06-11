@@ -204,42 +204,46 @@ module MIPS_Pipeline(
     wire  [1:0] ForwardA, ForwardB;
 
 //==== Submodule Connection ===================
-    CONTROL control_1(.Op(instr_1_ID),
-                      .ctrl_flush(ctrl_flush),
-                      .RegDst(RegDst_ID),
-                      .Jump(Jump_ID),
-                      .Branch(Branch_ID),
-                      .MemRead(MemRead_ID),
-                      .MemtoReg(MemtoReg_ID),
-                      .ALUOp(ALUOp_ID),
-                      .MemWrite(MemWrite_ID),
-                      .ALUSrc(ALUSrc_ID),
-                      .RegWrite(RegWrite_ID),
-                      .Jal(Jal_ID),
-                      .ExtOp(ExtOp_ID)
+    CONTROL control_1(
+        .Op(instr_1_ID),
+        .ctrl_flush(ctrl_flush),
+        .RegDst(RegDst_ID),
+        .Jump(Jump_ID),
+        .Branch(Branch_ID),
+        .MemRead(MemRead_ID),
+        .MemtoReg(MemtoReg_ID),
+        .ALUOp(ALUOp_ID),
+        .MemWrite(MemWrite_ID),
+        .ALUSrc(ALUSrc_ID),
+        .RegWrite(RegWrite_ID),
+        .Jal(Jal_ID),
+        .ExtOp(ExtOp_ID)
     );
-    REGISTER register_1(.clk(clk),
-                        .rst_n(rst_n),
-                        .RegWrite(RegWrite_WB),
-                        .ReadReg1(instr_2_ID),
-                        .ReadReg2(instr_3_ID),
-                        .WriteReg(WriteReg),
-                        .WriteData(WriteData),
-                        .ReadData1(ReadData1_ID),
-                        .ReadData2(ReadData2_ID)
+    REGISTER register_1(
+        .clk(clk),
+        .rst_n(rst_n),
+        .RegWrite(RegWrite_WB),
+        .ReadReg1(instr_2_ID),
+        .ReadReg2(instr_3_ID),
+        .WriteReg(WriteReg),
+        .WriteData(WriteData),
+        .ReadData1(ReadData1_ID),
+        .ReadData2(ReadData2_ID)
     );
-    ALU_CONTROL ALU_CONTROL_1(.funct(extended_instr_5_EX[5:0]),
-                              .ALUOp(ALUOp_EX),
-                              .ALUCtrl(ALUCtrl),
-                              .JumpReg(JumpReg_EX),
-                              .Shift(Shift_EX),
-                              .Jalr(Jalr_EX)
+    ALU_CONTROL ALU_CONTROL_1(
+        .funct(extended_instr_5_EX[5:0]),
+        .ALUOp(ALUOp_EX),
+        .ALUCtrl(ALUCtrl),
+        .JumpReg(JumpReg_EX),
+        .Shift(Shift_EX),
+        .Jalr(Jalr_EX)
     );
-    ALU ALU_1(.ctrl(ALUCtrl),
-              .in_0(alu_in_0),
-              .in_1(alu_in_1),
-              .result(ALU_result_EX),
-              .Zero(Zero_EX)
+    ALU ALU_1(
+        .ctrl(ALUCtrl),
+        .in_0(alu_in_0),
+        .in_1(alu_in_1),
+        .result(ALU_result_EX),
+        .Zero(Zero_EX)
     );
 
 //==== Sequential Part ========================
@@ -465,16 +469,16 @@ module MIPS_Pipeline(
     assign instr_4_ID = instruction_ID[15:11]; // write reg, rd
     assign instr_5_ID = instruction_ID[15:0];  // signed extend
     // Sign extend
-    assign extended_instr_5_ID = {{16{instr_5_ID[15]}}, instr_5_ID};
+    assign extended_instr_5_ID = { { 16{instr_5_ID[15] } }, instr_5_ID };
     // ==== stage EX  ====
     // Register write
     assign WriteFromInstr_EX = (RegDst_EX)? instr_4_EX : instr_3_EX; // MUX
     assign WriteFromJal = 5'd31;
     // PC add imm
-    assign extended_shift2 = {extended_instr_5_EX[29:0], 2'b00};
+    assign extended_shift2 = { extended_instr_5_EX[29:0], 2'b00 };
     assign PC_add_imm_EX = PC_plus4_EX + extended_shift2;
     // ALU input
-    assign alu_orig_in_0 = (Shift_EX)? {27'b0, extended_instr_5_EX[10:6]} : ReadData1_EX;
+    assign alu_orig_in_0 = (Shift_EX)? { 27'b0, extended_instr_5_EX[10:6] } : ReadData1_EX;
     // Hazard Handling
     assign alu_in_0 = (ForwardA[0])? WriteData :
                       (ForwardA[1])? ALU_result_MEM : alu_orig_in_0;
@@ -485,73 +489,73 @@ module MIPS_Pipeline(
     // Branch
     assign PCsrc = Branch_MEM & Zero_MEM;
     // Data Memory input
-    assign DCACHE_addr = ALU_result_MEM[31:2];
+    assign DCACHE_addr  = ALU_result_MEM[31:2];
     assign DCACHE_wdata = ReadData2_MEM;
-    assign DCACHE_wen = MemWrite_MEM;
-    assign DCACHE_ren = MemRead_MEM;
-    assign rdata_D_MEM = DCACHE_rdata;
+    assign DCACHE_wen   = MemWrite_MEM;
+    assign DCACHE_ren   = MemRead_MEM;
+    assign rdata_D_MEM  = DCACHE_rdata;
     // ==== stage WB  ====
     // Data Memory output
     assign return_data = (MemtoReg_WB)? rdata_D_WB : ALU_result_WB; // MUX
     // Register Write
-    assign WriteReg = (Jal_WB)? WriteFromJal : WriteFromInstr_WB;
+    assign WriteReg  = (Jal_WB)? WriteFromJal : WriteFromInstr_WB;
     assign WriteData = (Jal_WB | Jalr_WB)? PC_plus4_WB : return_data;
 
 //==== Restore Part ===========================
     // ==== stage ID  ====
-    assign PC_ID_old = PC_ID;
-    assign PC_plus4_ID_old = PC_plus4_ID;
+    assign PC_ID_old          = PC_ID;
+    assign PC_plus4_ID_old    = PC_plus4_ID;
     assign instruction_ID_old = instruction_ID;
     // ==== stage EX  ====
-    assign PC_EX_old = PC_EX;
+    assign PC_EX_old          = PC_EX;
     assign instruction_EX_old = instruction_EX;
-    assign PC_plus4_EX_old = PC_plus4_EX;
-    assign RegDst_EX_old = RegDst_EX;
-    assign Branch_EX_old = Branch_EX;
-    assign MemRead_EX_old = MemRead_EX;
-    assign MemtoReg_EX_old = MemtoReg_EX;
-    assign ALUOp_EX_old = ALUOp_EX;
-    assign MemWrite_EX_old = MemWrite_EX;
-    assign ALUSrc_EX_old = ALUSrc_EX;
-    assign RegWrite_EX_old = RegWrite_EX;
-    assign Jal_EX_old = Jal_EX;
-    assign ExtOp_EX_old = ExtOp_EX;
+    assign PC_plus4_EX_old    = PC_plus4_EX;
+    assign RegDst_EX_old      = RegDst_EX;
+    assign Branch_EX_old      = Branch_EX;
+    assign MemRead_EX_old     = MemRead_EX;
+    assign MemtoReg_EX_old    = MemtoReg_EX;
+    assign ALUOp_EX_old       = ALUOp_EX;
+    assign MemWrite_EX_old    = MemWrite_EX;
+    assign ALUSrc_EX_old      = ALUSrc_EX;
+    assign RegWrite_EX_old    = RegWrite_EX;
+    assign Jal_EX_old         = Jal_EX;
+    assign ExtOp_EX_old       = ExtOp_EX;
 
-    assign PC_plus4_EX_old = PC_plus4_EX;
-    assign ReadData1_EX_old = ReadData1_EX;
-    assign ReadData2_EX_old = ReadData2_EX;
+    assign PC_plus4_EX_old         = PC_plus4_EX;
+    assign ReadData1_EX_old        = ReadData1_EX;
+    assign ReadData2_EX_old        = ReadData2_EX;
     assign extended_instr_5_EX_old = extended_instr_5_EX;
-    assign instr_2_EX_old = instr_2_EX;
-    assign instr_3_EX_old = instr_3_EX;
-    assign instr_4_EX_old = instr_4_EX;
+    assign instr_2_EX_old          = instr_2_EX;
+    assign instr_3_EX_old          = instr_3_EX;
+    assign instr_4_EX_old          = instr_4_EX;
     // ==== stage MEM ====
-    assign PC_MEM_old = PC_MEM;
+    assign PC_MEM_old          = PC_MEM;
     assign instruction_MEM_old = instruction_MEM;
-    assign PC_plus4_MEM_old = PC_plus4_MEM;
-    assign Branch_MEM_old = Branch_MEM;
-    assign MemRead_MEM_old = MemRead_MEM;
-    assign MemtoReg_MEM_old = MemtoReg_MEM;
-    assign MemWrite_MEM_old = MemWrite_MEM;
-    assign RegWrite_MEM_old = RegWrite_MEM;
-    assign Jal_MEM_old = Jal_MEM;
-    assign Jalr_MEM_old = Jalr_MEM;
+    assign PC_plus4_MEM_old    = PC_plus4_MEM;
+    assign Branch_MEM_old      = Branch_MEM;
+    assign MemRead_MEM_old     = MemRead_MEM;
+    assign MemtoReg_MEM_old    = MemtoReg_MEM;
+    assign MemWrite_MEM_old    = MemWrite_MEM;
+    assign RegWrite_MEM_old    = RegWrite_MEM;
+    assign Jal_MEM_old         = Jal_MEM;
+    assign Jalr_MEM_old        = Jalr_MEM;
             
-    assign PC_add_imm_MEM_old = PC_add_imm_MEM;
-    assign Zero_MEM_old = Zero_MEM;
-    assign ALU_result_MEM_old = ALU_result_MEM;
-    assign ReadData2_MEM_old = ReadData2_MEM;
+    assign PC_add_imm_MEM_old     = PC_add_imm_MEM;
+    assign Zero_MEM_old           = Zero_MEM;
+    assign ALU_result_MEM_old     = ALU_result_MEM;
+    assign ReadData2_MEM_old      = ReadData2_MEM;
     assign WriteFromInstr_MEM_old = WriteFromInstr_MEM;
     // ==== stage WB  ====
-    assign PC_WB_old = PC_WB;
+    assign PC_WB_old          = PC_WB;
     assign instruction_WB_old = instruction_WB;
-    assign PC_plus4_WB_old = PC_plus4_WB;
-    assign MemtoReg_WB_old = MemtoReg_WB;
-    assign RegWrite_WB_old = RegWrite_WB;
-    assign Jal_WB_old = Jal_WB;
-    assign Jalr_WB_old = Jalr_WB;
+    assign PC_plus4_WB_old    = PC_plus4_WB;
+    assign MemtoReg_WB_old    = MemtoReg_WB;
+    assign RegWrite_WB_old    = RegWrite_WB;
+    assign Jal_WB_old         = Jal_WB;
+    assign Jalr_WB_old        = Jalr_WB;
 
-    assign rdata_D_WB_old = rdata_D_WB;
-    assign ALU_result_WB_old = ALU_result_WB;
+    assign rdata_D_WB_old        = rdata_D_WB;
+    assign ALU_result_WB_old     = ALU_result_WB;
     assign WriteFromInstr_WB_old = WriteFromInstr_WB;
 
 //==== Hazard Handling Part ===================
