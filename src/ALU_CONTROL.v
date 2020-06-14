@@ -54,7 +54,7 @@ module ALU_CONTROL(
                 Shift   = 0;
                 Jalr    = 0;
             end
-            9'b010001001: begin // 08: jalr
+            9'b010001001: begin // 09: jalr
                 ALUCtrl = 4'b0000; // xxxx
                 JumpReg = 1;
                 Shift   = 0;
