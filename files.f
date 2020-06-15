@@ -8,3 +8,8 @@
 ./src/ALU_CONTROL.v
 ./src/CONTROL.v
 ./src/REGISTER.v
+./src/Multiplier/Iter32_mult.v
+./src/Multiplier/Iter8_mult.v
+./src/Multiplier/Iter4_mult.v
+./src/Multiplier/Iter1_mult.v
+./src/Divider/Iter_div.v

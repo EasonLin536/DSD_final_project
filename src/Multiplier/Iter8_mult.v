@@ -1,4 +1,5 @@
-module IterMultiplier(
+/* Use 8 cycles to complete calculation */
+module Iter8Multiplier(
     clk,
     rst_n,
     in_valid,
@@ -15,14 +16,15 @@ module IterMultiplier(
     output reg        out_valid, stall;
 
 //==== Reg/Wire Declaration ===================
-    reg [31:0] mplier_r, mplier_w;
-    reg [31:0] mcand_r, mcand_w;
-    reg  [1:0] state, state_next;
-    reg  [4:0] op_cnt_r, op_cnt_w; // uses 32 cycles to complete calculation
-    reg [63:0] product_r, product_w;
-    reg [63:0] partial_product, partial_temp;
-
-    assign product = product_r;
+    reg  [31:0] mplier_r, mcand_r;
+    wire [31:0] mplier_w, mcand_w;
+    reg   [1:0] state, state_next;
+    reg   [4:0] op_cnt_r; // uses 32 cycles to complete calculation
+    wire [31:0] op_cnt_w;
+    reg  [63:0] product_r, product_w;
+    wire [63:0] partial_product;
+    reg  [63:0] partial_temp0, partial_temp1, partial_temp2, partial_temp3;
+    wire  [4:0] idx0, idx1, idx2, idx3;
 
 //==== FSM ====================================
     parameter S_IDLE = 2'd0;
@@ -32,36 +34,47 @@ module IterMultiplier(
     always @(*) begin
         case (state)
             S_IDLE:  state_next = (in_valid)? S_OP : S_IDLE;
-            S_OP:    state_next = (op_cnt_r == 31)? S_END : S_OP;
+            S_OP:    state_next = (op_cnt_r == 28)? S_END : S_OP;
             S_END:   state_next = S_IDLE;
             default: state_next = S_IDLE;
         endcase
     end
 
 //==== Combinational ==========================
+    // output
+    assign product = product_r;
+    
+    // index for processing 
+    assign idx0 = op_cnt_r;
+    assign idx1 = op_cnt_r + 1;
+    assign idx2 = op_cnt_r + 2;
+    assign idx3 = op_cnt_r + 3;
+
+    // sum up partial_temps
+    assign partial_product = (partial_temp0 + partial_temp1) +
+                             (partial_temp2 + partial_temp3);
+
     // mplier, mcand
-    always @(*) begin
-        mplier_w = (in_valid)? mplier : mplier_r;
-        mcand_w  = (in_valid)? mcand :  mcand_r;
-    end
+    assign mplier_w = (in_valid)? mplier : mplier_r;
+    assign mcand_w  = (in_valid)? mcand :  mcand_r;
 
     // opt_cnt
-    always @(*) begin
-        op_cnt_w = (state == S_OP)? op_cnt_r + 1 : 5'd0;
-    end
+    assign op_cnt_w = (state == S_OP)? op_cnt_r + 4 : 0;
 
     // partial product
     always @(*) begin
         if (state == S_OP) begin
-            partial_temp[31:0] = (mplier_r[op_cnt_r])? mcand_r : 32'd0;
+            partial_temp0 = (mplier_r[idx0])? { 32'd0, mcand_r } << idx0 : 0;
+            partial_temp1 = (mplier_r[idx1])? { 32'd0, mcand_r } << idx1 : 0;
+            partial_temp2 = (mplier_r[idx2])? { 32'd0, mcand_r } << idx2 : 0;
+            partial_temp3 = (mplier_r[idx3])? { 32'd0, mcand_r } << idx3 : 0;
         end
         else begin
-            partial_temp = 32'd0;
+            partial_temp0 = 0;
+            partial_temp1 = 0;
+            partial_temp2 = 0;
+            partial_temp3 = 0;
         end
-    end
-
-    always @(*) begin
-        partial_product = (state == S_OP)? partial_temp << op_cnt_r : 32'd0;
     end
 
     // product
@@ -70,7 +83,7 @@ module IterMultiplier(
             S_IDLE:  product_w = 64'd0;
             S_OP:    product_w = product_r + partial_product;
             S_END:   product_w = product_r;
-            default: product_w = 64'd0; 
+            default: product_w = 64'd0;
         endcase
     end
     
@@ -84,10 +97,10 @@ module IterMultiplier(
     always @(posedge clk) begin
         if (!rst_n) begin
             state     <= S_IDLE;
-            op_cnt_r  <= 5'd0;
-            product_r <= 64'd0;
-            mplier_r  <= 32'd0;
-            mcand_r   <= 32'd0;
+            op_cnt_r  <= 0;
+            product_r <= 0;
+            mplier_r  <= 0;
+            mcand_r   <= 0;
         end
         else begin
             state     <= state_next;

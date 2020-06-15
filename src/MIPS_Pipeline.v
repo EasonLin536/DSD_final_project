@@ -258,7 +258,7 @@ module MIPS_Pipeline(
         .result(ALU_result),
         .Zero(Zero_EX)
     );
-    IterMultiplier multiplier(
+    Iter4Multiplier multiplier(
         .clk(clk),
         .rst_n(rst_n),
         .in_valid(mult_in_valid),
@@ -539,16 +539,12 @@ module MIPS_Pipeline(
     assign mfhi = (ALUOp_EX == 3'b010 && extended_instr_5_EX[5:0] == 6'd16)? 1 : 0;
     assign mflo = (ALUOp_EX == 3'b010 && extended_instr_5_EX[5:0] == 6'd18)? 1 : 0;
     assign div  = (ALUOp_EX == 3'b010 && extended_instr_5_EX[5:0] == 6'd26)? 1 : 0;
-    assign mult_in_valid = (mult)? 1 : 0;
+    assign mult_in_valid = (mult)? 1 : 0; // enable signal
     assign div_in_valid  = (div)?  1 : 0;
-    assign HI_w = (mult_out_valid)? mult_product[63:32] : 
+    assign HI_w = (mult_out_valid)? mult_product[63:32] : // store output to $Hi or $LO
                   (div_out_valid)? div_remainder : HI_r;
     assign LO_w = (mult_out_valid)? mult_product[31:0] : 
                   (div_out_valid)? div_quotient : LO_r;
-    // assign HI_w = (mult_out_valid)? mult_product[63:32] : HI_r;
-    // assign LO_w = (mult_out_valid)? mult_product[31:0] : LO_r;
-    // assign HI_w = (div_out_valid)? div_remainder : HI_r;
-    // assign LO_w = (div_out_valid)? div_quotient : LO_r;
     assign ALU_result_EX = (mflo)? LO_r :
                            (mfhi)? HI_r : ALU_result;
     // ==== stage MEM ====
