@@ -95,6 +95,9 @@ module MIPS_Pipeline(
     wire [63:0] mult_product;
     wire        mult_in_valid, mult_out_valid;
     wire        mult_stall;
+    wire [31:0] div_remainder, div_quotient;
+    wire        div_in_valid, div_out_valid;
+    wire        div_stall;
     // special registers
     reg  [31:0] HI_r, LO_r;
     wire [31:0] HI_w, LO_w;
@@ -265,6 +268,17 @@ module MIPS_Pipeline(
         .out_valid(mult_out_valid), // tell the processor to fetch output
         .stall(mult_stall) // tell the processor to stall cycles
     );
+    IterDivider divider(
+        .clk(clk),
+        .rst_n(rst_n),
+        .in_valid(div_in_valid),
+        .dividend(alu_in_0),
+        .divisor(alu_in_1),
+        .remainder(div_remainder), // store to $HI
+        .quotient(div_quotient), // store to $LO
+        .out_valid(div_out_valid),
+        .stall(div_stall)
+    );
 
 //==== Sequential Part ========================
     // ==== stage IF  ====
@@ -272,7 +286,7 @@ module MIPS_Pipeline(
         if (!rst_n) begin
             PC_r <= 0;
         end
-        else if (mult_stall) begin
+        else if (mult_stall | div_stall) begin
             PC_r <= PC_old;
         end
         else begin
@@ -281,12 +295,12 @@ module MIPS_Pipeline(
     end
     // ==== stage ID  ====
     always @(posedge clk) begin
-        if (!rst_n | ((Jump_ID | JumpReg_EX | PCsrc) & ~(ICACHE_stall | DCACHE_stall | mult_stall))) begin
+        if (!rst_n | ((Jump_ID | JumpReg_EX | PCsrc) & ~(ICACHE_stall | DCACHE_stall | mult_stall | div_stall))) begin
             PC_ID          <= 0;
             PC_plus4_ID    <= 0;
             instruction_ID <= 0;
         end
-        else if (ICACHE_stall | DCACHE_stall | ~IF_ID_write | mult_stall) begin
+        else if (ICACHE_stall | DCACHE_stall | ~IF_ID_write | mult_stall | div_stall) begin
             PC_ID          <= PC_ID_old;
             PC_plus4_ID    <= PC_plus4_ID_old;
             instruction_ID <= instruction_ID_old;
@@ -299,7 +313,7 @@ module MIPS_Pipeline(
     end
     // ==== stage EX  ====
     always @(posedge clk) begin
-        if (!rst_n | ((JumpReg_EX | PCsrc) & ~(ICACHE_stall | DCACHE_stall | mult_stall))) begin
+        if (!rst_n | ((JumpReg_EX | PCsrc) & ~(ICACHE_stall | DCACHE_stall | mult_stall | div_stall))) begin
             PC_EX               <= 0;
             instruction_EX      <= 0;
             PC_plus4_EX         <= 0;
@@ -322,7 +336,7 @@ module MIPS_Pipeline(
             instr_3_EX          <= 0;
             instr_4_EX          <= 0;
         end
-        else if(ICACHE_stall | DCACHE_stall | mult_stall) begin
+        else if(ICACHE_stall | DCACHE_stall | mult_stall | div_stall) begin
             PC_EX               <= PC_EX_old;
             instruction_EX      <= instruction_EX_old;
             PC_plus4_EX         <= PC_plus4_EX_old;
@@ -383,7 +397,7 @@ module MIPS_Pipeline(
     end
     // ==== stage MEM ====
     always @(posedge clk) begin
-        if (!rst_n | (PCsrc & ~(ICACHE_stall | DCACHE_stall | mult_stall))) begin
+        if (!rst_n | (PCsrc & ~(ICACHE_stall | DCACHE_stall | mult_stall | div_stall))) begin
             PC_MEM             <= 0;
             instruction_MEM    <= 0;
             PC_plus4_MEM       <= 0;
@@ -401,7 +415,7 @@ module MIPS_Pipeline(
             ReadData2_MEM      <= 0;
             WriteFromInstr_MEM <= 0;
         end
-        else if (ICACHE_stall | DCACHE_stall | mult_stall) begin
+        else if (ICACHE_stall | DCACHE_stall | mult_stall | div_stall) begin
             PC_MEM             <= PC_MEM_old;
             instruction_MEM    <= instruction_MEM_old;
             PC_plus4_MEM       <= PC_plus4_MEM_old;
@@ -453,7 +467,7 @@ module MIPS_Pipeline(
             ALU_result_WB     <= 0;
             WriteFromInstr_WB <= 0;
         end
-        else if (ICACHE_stall | DCACHE_stall | mult_stall) begin
+        else if (ICACHE_stall | DCACHE_stall | mult_stall | div_stall) begin
             PC_WB             <= PC_WB_old;
             instruction_WB    <= instruction_WB_old;
             PC_plus4_WB       <= PC_plus4_WB_old;
@@ -526,8 +540,15 @@ module MIPS_Pipeline(
     assign mflo = (ALUOp_EX == 3'b010 && extended_instr_5_EX[5:0] == 6'd18)? 1 : 0;
     assign div  = (ALUOp_EX == 3'b010 && extended_instr_5_EX[5:0] == 6'd26)? 1 : 0;
     assign mult_in_valid = (mult)? 1 : 0;
-    assign HI_w = (mult_out_valid)? mult_product[63:32] : HI_r; // add div
-    assign LO_w = (mult_out_valid)? mult_product[31:0] : LO_r; // add div
+    assign div_in_valid  = (div)?  1 : 0;
+    assign HI_w = (mult_out_valid)? mult_product[63:32] : 
+                  (div_out_valid)? div_remainder : HI_r;
+    assign LO_w = (mult_out_valid)? mult_product[31:0] : 
+                  (div_out_valid)? div_quotient : LO_r;
+    // assign HI_w = (mult_out_valid)? mult_product[63:32] : HI_r;
+    // assign LO_w = (mult_out_valid)? mult_product[31:0] : LO_r;
+    // assign HI_w = (div_out_valid)? div_remainder : HI_r;
+    // assign LO_w = (div_out_valid)? div_quotient : LO_r;
     assign ALU_result_EX = (mflo)? LO_r :
                            (mfhi)? HI_r : ALU_result;
     // ==== stage MEM ====

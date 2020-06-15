@@ -1,1 +1,3 @@
 MIPS/
+src/Multiplier/Mult_tb.v
+src/Divider/Div_tb.v
