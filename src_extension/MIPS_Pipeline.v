@@ -51,12 +51,13 @@ module MIPS_Pipeline(
     reg  [31:0] PC_plus4_ID, PC_plus4_EX, PC_plus4_MEM, PC_plus4_WB;
 
     wire [31:0] jump_addr;
-    wire [31:0] PC_add_imm_EX;
-    reg  [31:0] PC_add_imm_MEM;
+    wire [31:0] miss_addr;
+    wire [31:0] PC_add_imm_IF;
+    reg  [31:0] PC_add_imm_ID;
     wire [31:0] if_branch;
     wire [31:0] if_jump;
     wire [31:0] if_jr;
-    wire        PCsrc;
+    wire [31:0] if_miss;
     // instruction memory output
     wire [25:0] instr_0_ID;
     wire  [5:0] instr_1_ID;
@@ -64,8 +65,10 @@ module MIPS_Pipeline(
     reg   [4:0] instr_2_EX;
     wire  [4:0] instr_3_ID;
     reg   [4:0] instr_3_EX;
+    reg   [4:0] instr_3_MEM;
     wire  [4:0] instr_4_ID;
     reg   [4:0] instr_4_EX;
+    wire [15:0] instr_5_IF;
     wire [15:0] instr_5_ID;
     // Register input
     wire  [4:0] WriteFromInstr_EX;
@@ -78,6 +81,7 @@ module MIPS_Pipeline(
     wire [31:0] ReadData2_ID;
     reg  [31:0] ReadData2_EX, ReadData2_MEM;
     // Sign extend
+    wire [31:0] extended_instr_5_IF;
     wire [31:0] extended_instr_5_ID;
     reg  [31:0] extended_instr_5_EX;
     wire [31:0] extended_shift2;
@@ -85,8 +89,6 @@ module MIPS_Pipeline(
     wire [31:0] alu_in_0, alu_in_1;
     wire [31:0] alu_orig_in_0;
     // ALU output
-    wire        Zero_EX;
-    reg         Zero_MEM;
     wire [31:0] ALU_result;
     wire [31:0] ALU_result_EX;
     reg  [31:0] ALU_result_MEM, ALU_result_WB;
@@ -110,7 +112,7 @@ module MIPS_Pipeline(
     // CONTROL
     wire        RegDst_ID;
     wire        Jump_ID;
-    wire        Branch_ID;
+    wire  [1:0] Branch_ID;
     wire        MemRead_ID;
     wire        MemtoReg_ID;
     wire  [2:0] ALUOp_ID;
@@ -121,7 +123,6 @@ module MIPS_Pipeline(
     wire        ExtOp_ID;
 
     reg         RegDst_EX;
-    reg         Branch_EX;
     reg         MemRead_EX;
     reg         MemtoReg_EX;
     reg   [2:0] ALUOp_EX;
@@ -131,7 +132,6 @@ module MIPS_Pipeline(
     reg         Jal_EX;
     reg         ExtOp_EX;
 
-    reg         Branch_MEM;
     reg         MemRead_MEM;
     reg         MemtoReg_MEM;
     reg         MemWrite_MEM;
@@ -162,12 +162,13 @@ module MIPS_Pipeline(
     // end debug
 
     wire [31:0] PC_plus4_ID_old, PC_plus4_EX_old, PC_plus4_MEM_old, PC_plus4_WB_old;
+    wire [31:0] PC_add_imm_ID_old;
 
-    wire [31:0] PC_add_imm_MEM_old;
     // instruction memory output
     wire  [4:0] instr_2_EX_old;
     wire  [4:0] instr_3_EX_old;
     wire  [4:0] instr_4_EX_old;
+    wire  [4:0] instr_3_MEM_old;
     // Register input
     wire  [4:0] WriteFromInstr_MEM_old, WriteFromInstr_WB_old;
 
@@ -178,14 +179,12 @@ module MIPS_Pipeline(
     wire [31:0] extended_instr_5_EX_old;
     // ALU input
     // ALU output
-    wire        Zero_MEM_old;
     wire [31:0] ALU_result_MEM_old, ALU_result_WB_old;
     // Data Memory output
     wire [31:0] rdata_D_WB_old;
 
     // CONTROL
     wire        RegDst_EX_old;
-    wire        Branch_EX_old;
     wire        MemRead_EX_old;
     wire        MemtoReg_EX_old;
     wire  [2:0] ALUOp_EX_old;
@@ -195,7 +194,6 @@ module MIPS_Pipeline(
     wire        Jal_EX_old;
     wire        ExtOp_EX_old;
 
-    wire        Branch_MEM_old;
     wire        MemRead_MEM_old;
     wire        MemtoReg_MEM_old;
     wire        MemWrite_MEM_old;
@@ -215,48 +213,52 @@ module MIPS_Pipeline(
     wire        ctrl_flush;
 
     wire  [1:0] ForwardA, ForwardB;
+    wire        ForwardA_ID, ForwardB_ID;
+    wire        ForwardWriteData_MEM;
+    // === Branch Prediction ===
+    wire        stall;
+    wire        PreWrong;
+    wire  [5:0] opcode_IF;
+    wire        BrPre;
+    wire [31:0] ReadData1_forwarded_ID, ReadData2_forwarded_ID;
+    wire        equal;
 
 //==== Submodule Connection ===================
-    CONTROL control_1(
-        .Op(instr_1_ID),
-        .ctrl_flush(ctrl_flush),
-        .RegDst(RegDst_ID),
-        .Jump(Jump_ID),
-        .Branch(Branch_ID),
-        .MemRead(MemRead_ID),
-        .MemtoReg(MemtoReg_ID),
-        .ALUOp(ALUOp_ID),
-        .MemWrite(MemWrite_ID),
-        .ALUSrc(ALUSrc_ID),
-        .RegWrite(RegWrite_ID),
-        .Jal(Jal_ID),
-        .ExtOp(ExtOp_ID)
+    CONTROL control_1(.Op(instr_1_ID),
+                      .ctrl_flush(ctrl_flush),
+                      .RegDst(RegDst_ID),
+                      .Jump(Jump_ID),
+                      .Branch(Branch_ID),
+                      .MemRead(MemRead_ID),
+                      .MemtoReg(MemtoReg_ID),
+                      .ALUOp(ALUOp_ID),
+                      .MemWrite(MemWrite_ID),
+                      .ALUSrc(ALUSrc_ID),
+                      .RegWrite(RegWrite_ID),
+                      .Jal(Jal_ID),
+                      .ExtOp(ExtOp_ID)
     );
-    REGISTER register_1(
-        .clk(clk),
-        .rst_n(rst_n),
-        .RegWrite(RegWrite_WB),
-        .ReadReg1(instr_2_ID),
-        .ReadReg2(instr_3_ID),
-        .WriteReg(WriteReg),
-        .WriteData(WriteData),
-        .ReadData1(ReadData1_ID),
-        .ReadData2(ReadData2_ID)
+    REGISTER register_1(.clk(clk),
+                        .rst_n(rst_n),
+                        .RegWrite(RegWrite_WB),
+                        .ReadReg1(instr_2_ID),
+                        .ReadReg2(instr_3_ID),
+                        .WriteReg(WriteReg),
+                        .WriteData(WriteData),
+                        .ReadData1(ReadData1_ID),
+                        .ReadData2(ReadData2_ID)
     );
-    ALU_CONTROL ALU_CONTROL_1(
-        .funct(extended_instr_5_EX[5:0]),
-        .ALUOp(ALUOp_EX),
-        .ALUCtrl(ALUCtrl),
-        .JumpReg(JumpReg_EX),
-        .Shift(Shift_EX),
-        .Jalr(Jalr_EX)
+    ALU_CONTROL ALU_CONTROL_1(.funct(extended_instr_5_EX[5:0]),
+                              .ALUOp(ALUOp_EX),
+                              .ALUCtrl(ALUCtrl),
+                              .JumpReg(JumpReg_EX),
+                              .Shift(Shift_EX),
+                              .Jalr(Jalr_EX)
     );
-    ALU ALU_1(
-        .ctrl(ALUCtrl),
-        .in_0(alu_in_0),
-        .in_1(alu_in_1),
-        .result(ALU_result),
-        .Zero(Zero_EX)
+    ALU ALU_1(.ctrl(ALUCtrl),
+              .in_0(alu_in_0),
+              .in_1(alu_in_1),
+              .result(ALU_result)
     );
     BoothMultiplier multiplier(
         .clk(clk),
@@ -295,30 +297,32 @@ module MIPS_Pipeline(
     end
     // ==== stage ID  ====
     always @(posedge clk) begin
-        if (!rst_n | ((Jump_ID | JumpReg_EX | PCsrc) & ~(ICACHE_stall | DCACHE_stall | mult_stall | div_stall))) begin
+        if (!rst_n | ((Jump_ID | JumpReg_EX | PreWrong) & ~(ICACHE_stall | DCACHE_stall | mult_stall | div_stall))) begin
             PC_ID          <= 0;
             PC_plus4_ID    <= 0;
             instruction_ID <= 0;
+            PC_add_imm_ID  <= 0;
         end
         else if (ICACHE_stall | DCACHE_stall | ~IF_ID_write | mult_stall | div_stall) begin
             PC_ID          <= PC_ID_old;
             PC_plus4_ID    <= PC_plus4_ID_old;
             instruction_ID <= instruction_ID_old;
+            PC_add_imm_ID  <= PC_add_imm_ID_old;
         end
         else begin
             PC_ID          <= PC_r;
             PC_plus4_ID    <= PC_plus4_IF;
             instruction_ID <= instruction_IF;
+            PC_add_imm_ID  <= PC_add_imm_IF;
         end
     end
     // ==== stage EX  ====
     always @(posedge clk) begin
-        if (!rst_n | ((JumpReg_EX | PCsrc) & ~(ICACHE_stall | DCACHE_stall | mult_stall | div_stall))) begin
+        if (!rst_n | ((JumpReg_EX) & ~(ICACHE_stall | DCACHE_stall | mult_stall | div_stall))) begin
             PC_EX               <= 0;
             instruction_EX      <= 0;
             PC_plus4_EX         <= 0;
             RegDst_EX           <= 0;
-            Branch_EX           <= 0;
             MemRead_EX          <= 0;
             MemtoReg_EX         <= 0;
             ALUOp_EX            <= 0;
@@ -341,7 +345,6 @@ module MIPS_Pipeline(
             instruction_EX      <= instruction_EX_old;
             PC_plus4_EX         <= PC_plus4_EX_old;
             RegDst_EX           <= RegDst_EX_old;
-            Branch_EX           <= Branch_EX_old;
             MemRead_EX          <= MemRead_EX_old;
             MemtoReg_EX         <= MemtoReg_EX_old;
             ALUOp_EX            <= ALUOp_EX_old;
@@ -364,7 +367,6 @@ module MIPS_Pipeline(
             instruction_EX      <= instruction_ID;
             PC_plus4_EX         <= PC_plus4_ID;
             RegDst_EX           <= RegDst_ID;
-            Branch_EX           <= Branch_ID;
             MemRead_EX          <= MemRead_ID;
             MemtoReg_EX         <= MemtoReg_ID;
             ALUOp_EX            <= ALUOp_ID;
@@ -397,11 +399,10 @@ module MIPS_Pipeline(
     end
     // ==== stage MEM ====
     always @(posedge clk) begin
-        if (!rst_n | (PCsrc & ~(ICACHE_stall | DCACHE_stall | mult_stall | div_stall))) begin
+        if (!rst_n) begin // add other constraints? -> not needed
             PC_MEM             <= 0;
             instruction_MEM    <= 0;
             PC_plus4_MEM       <= 0;
-            Branch_MEM         <= 0;
             MemRead_MEM        <= 0;
             MemtoReg_MEM       <= 0;
             MemWrite_MEM       <= 0;
@@ -409,17 +410,15 @@ module MIPS_Pipeline(
             Jal_MEM            <= 0;
             Jalr_MEM           <= 0;
             
-            PC_add_imm_MEM     <= 0;
-            Zero_MEM           <= 0;
             ALU_result_MEM     <= 0;
             ReadData2_MEM      <= 0;
             WriteFromInstr_MEM <= 0;
+            instr_3_MEM         <= 0;
         end
         else if (ICACHE_stall | DCACHE_stall | mult_stall | div_stall) begin
             PC_MEM             <= PC_MEM_old;
             instruction_MEM    <= instruction_MEM_old;
             PC_plus4_MEM       <= PC_plus4_MEM_old;
-            Branch_MEM         <= Branch_MEM_old;
             MemRead_MEM        <= MemRead_MEM_old;
             MemtoReg_MEM       <= MemtoReg_MEM_old;
             MemWrite_MEM       <= MemWrite_MEM_old;
@@ -427,17 +426,15 @@ module MIPS_Pipeline(
             Jal_MEM            <= Jal_MEM_old;
             Jalr_MEM           <= Jalr_MEM_old;
 
-            PC_add_imm_MEM     <= PC_add_imm_MEM_old;
-            Zero_MEM           <= Zero_MEM_old;
             ALU_result_MEM     <= ALU_result_MEM_old;
             ReadData2_MEM      <= ReadData2_MEM_old;
             WriteFromInstr_MEM <= WriteFromInstr_MEM_old;
+            instr_3_MEM        <= instr_3_MEM_old;
         end
         else begin
             PC_MEM             <= PC_EX;
             instruction_MEM    <= instruction_EX;
             PC_plus4_MEM       <= PC_plus4_EX;
-            Branch_MEM         <= Branch_EX;
             MemRead_MEM        <= MemRead_EX;
             MemtoReg_MEM       <= MemtoReg_EX;
             MemWrite_MEM       <= MemWrite_EX;
@@ -445,11 +442,10 @@ module MIPS_Pipeline(
             Jal_MEM            <= Jal_EX;
             Jalr_MEM           <= Jalr_EX;
 
-            PC_add_imm_MEM     <= PC_add_imm_EX;
-            Zero_MEM           <= Zero_EX;
             ALU_result_MEM     <= ALU_result_EX;
             ReadData2_MEM      <= ReadData2_EX;
             WriteFromInstr_MEM <= WriteFromInstr_EX;
+            instr_3_MEM        <= instr_3_EX;
         end
     end
     // ==== stage WB  ====
@@ -499,16 +495,21 @@ module MIPS_Pipeline(
     // PC wire
     assign PC_plus4_IF = PC_r + 4;
     assign jump_addr   = { PC_plus4_ID[31:28], instr_0_ID, 2'b00 };
+    assign miss_addr   = (|(Branch_ID))? PC_add_imm_ID : PC_plus4_ID;
     assign if_jump     = (Jump_ID)? jump_addr : PC_plus4_IF; // MUX
     assign if_jr       = (JumpReg_EX)? alu_in_0 : if_jump; // MUX
-    assign if_branch   = (PCsrc)? PC_add_imm_MEM : if_jr; // MUX
-    assign PC_w        = (ICACHE_stall | DCACHE_stall | ~PCWrite)? PC_r : if_branch;
+    assign if_branch   = (BrPre)? PC_add_imm_IF : if_jr; // MUX
+    assign if_miss     = (PreWrong)? miss_addr : if_branch; // MUX
+    assign PC_w        = (ICACHE_stall | DCACHE_stall | ~PCWrite)? PC_r : if_miss;
 	// Instruction Fetch
 	assign ICACHE_ren     = 1'b1;
     assign ICACHE_wen     = 1'b0;
     assign ICACHE_addr    = PC_r[31:2];
     assign instruction_IF = ICACHE_rdata;
     assign ICACHE_wdata   = 0;
+    //Signed extend
+    assign instr_5_IF = instruction_IF[15:0];
+    assign extended_instr_5_IF = {{16{instr_5_IF[15]}}, instr_5_IF};
     // ==== stage ID  ====
     // Instruction memory output
     assign instr_0_ID = instruction_ID[25:0];  // PC shift left 2
@@ -518,16 +519,16 @@ module MIPS_Pipeline(
     assign instr_4_ID = instruction_ID[15:11]; // write reg, rd
     assign instr_5_ID = instruction_ID[15:0];  // signed extend
     // Sign extend
-    assign extended_instr_5_ID = { { 16{instr_5_ID[15] } }, instr_5_ID };
+    assign extended_instr_5_ID = {{16{instr_5_ID[15]}}, instr_5_ID};
     // ==== stage EX  ====
     // Register write
     assign WriteFromInstr_EX = (RegDst_EX)? instr_4_EX : instr_3_EX; // MUX
     assign WriteFromJal = 5'd31;
     // PC add imm
-    assign extended_shift2 = { extended_instr_5_EX[29:0], 2'b00 };
-    assign PC_add_imm_EX = PC_plus4_EX + extended_shift2;
+    assign extended_shift2 = {extended_instr_5_IF[29:0], 2'b00};
+    assign PC_add_imm_IF = PC_plus4_IF + extended_shift2;
     // ALU input
-    assign alu_orig_in_0 = (Shift_EX)? { 27'b0, extended_instr_5_EX[10:6] } : ReadData1_EX;
+    assign alu_orig_in_0 = (Shift_EX)? {27'b0, extended_instr_5_EX[10:6]} : ReadData1_EX;
     // Hazard Handling
     assign alu_in_0 = (ForwardA[0])? WriteData :
                       (ForwardA[1])? ALU_result_MEM : alu_orig_in_0;
@@ -549,10 +550,10 @@ module MIPS_Pipeline(
                            (mfhi)? HI_r : ALU_result;
     // ==== stage MEM ====
     // Branch
-    assign PCsrc = Branch_MEM & Zero_MEM;
+    //assign PCsrc = Branch_MEM & Zero_MEM;
     // Data Memory input
     assign DCACHE_addr  = ALU_result_MEM[31:2];
-    assign DCACHE_wdata = ReadData2_MEM;
+    assign DCACHE_wdata = (ForwardWriteData_MEM)? WriteData : ReadData2_MEM;
     assign DCACHE_wen   = MemWrite_MEM;
     assign DCACHE_ren   = MemRead_MEM;
     assign rdata_D_MEM  = DCACHE_rdata;
@@ -562,20 +563,26 @@ module MIPS_Pipeline(
     // Register Write
     assign WriteReg  = (Jal_WB)? WriteFromJal : WriteFromInstr_WB;
     assign WriteData = (Jal_WB | Jalr_WB)? PC_plus4_WB : return_data;
+    // ==== Branch Prediction  ====
+    assign stall                  = ICACHE_stall || DCACHE_stall || ~PCWrite || mult_stall || div_stall;
+    assign opcode_IF              = instruction_IF[31:26];
+    assign ReadData1_forwarded_ID = (ForwardA_ID)? ALU_result_MEM : ReadData1_ID;
+    assign ReadData2_forwarded_ID = (ForwardB_ID)? ALU_result_MEM : ReadData2_ID;
+    assign equal                  = (ReadData1_forwarded_ID == ReadData2_forwarded_ID)? 1'b1 : 1'b0;
 
 //==== Restore Part ===========================
-    // ==== stage IF  ====
+    // ==== stage IF ====
     assign PC_old             = PC_r;
-    // ==== stage ID  ====
+    // ==== stage ID ====
     assign PC_ID_old          = PC_ID;
     assign PC_plus4_ID_old    = PC_plus4_ID;
     assign instruction_ID_old = instruction_ID;
+    assign PC_add_imm_ID_old  = PC_add_imm_ID;
     // ==== stage EX  ====
     assign PC_EX_old          = PC_EX;
     assign instruction_EX_old = instruction_EX;
     assign PC_plus4_EX_old    = PC_plus4_EX;
     assign RegDst_EX_old      = RegDst_EX;
-    assign Branch_EX_old      = Branch_EX;
     assign MemRead_EX_old     = MemRead_EX;
     assign MemtoReg_EX_old    = MemtoReg_EX;
     assign ALUOp_EX_old       = ALUOp_EX;
@@ -596,7 +603,6 @@ module MIPS_Pipeline(
     assign PC_MEM_old          = PC_MEM;
     assign instruction_MEM_old = instruction_MEM;
     assign PC_plus4_MEM_old    = PC_plus4_MEM;
-    assign Branch_MEM_old      = Branch_MEM;
     assign MemRead_MEM_old     = MemRead_MEM;
     assign MemtoReg_MEM_old    = MemtoReg_MEM;
     assign MemWrite_MEM_old    = MemWrite_MEM;
@@ -604,8 +610,6 @@ module MIPS_Pipeline(
     assign Jal_MEM_old         = Jal_MEM;
     assign Jalr_MEM_old        = Jalr_MEM;
             
-    assign PC_add_imm_MEM_old     = PC_add_imm_MEM;
-    assign Zero_MEM_old           = Zero_MEM;
     assign ALU_result_MEM_old     = ALU_result_MEM;
     assign ReadData2_MEM_old      = ReadData2_MEM;
     assign WriteFromInstr_MEM_old = WriteFromInstr_MEM;
@@ -625,9 +629,13 @@ module MIPS_Pipeline(
 //==== Hazard Handling Part ===================
     HazardDetection HazardDetection_1(
         .id_ex_MemRead(MemRead_EX),
+        .id_ex_RegWrite(RegWrite_EX),
         .id_ex_rt(instr_3_EX),
+        .id_ex_rd(WriteFromInstr_EX),
         .if_id_rs(instr_2_ID),
         .if_id_rt(instr_3_ID),
+        //.Branch_ID(Branch_ID),
+        .opcode_ID(instr_1_ID),
         .PCWrite(PCWrite),
         .if_id_Write(IF_ID_write),
         .mux_Ctrl(ctrl_flush)
@@ -635,13 +643,37 @@ module MIPS_Pipeline(
 
    ForwardUnit ForwardUnit_1(
         .ex_mem_rd(WriteFromInstr_MEM),
+        .ex_mem_rt(instr_3_MEM),
         .mem_wb_rd(WriteReg),
+        .if_id_rs(instr_2_ID),
+        .if_id_rt(instr_3_ID),
         .id_ex_rs(instr_2_EX),
         .id_ex_rt(instr_3_EX),
         .ex_mem_RegWrite(RegWrite_MEM),
         .mem_wb_RegWrite(RegWrite_WB),
+        .ex_mem_MemWrite(MemWrite_MEM),
+        //.Branch_ID(Branch_ID),
+        .opcode_ID(instr_1_ID),
         .ForwardA(ForwardA),
-        .ForwardB(ForwardB)
+        .ForwardB(ForwardB),
+        .ForwardA_ID(ForwardA_ID),
+        .ForwardB_ID(ForwardB_ID),
+        .ForwardWriteData_MEM(ForwardWriteData_MEM)
+    );
+// ==== Branch Prediction =====================
+    PredictionUnit PredictionUnit_1(  
+        .clk(clk),
+        .rst_n(rst_n),
+        .stall(stall),
+        .PreWrong(PreWrong),
+        .opcode(opcode_IF),
+        .BrPre(BrPre)
     );
 
+    Comparater Comparater_1(  
+        .BrPre(BrPre),
+        .equal(equal),
+        .Ctrl_Br(Branch_ID),
+        .PreWrong(PreWrong)
+    );
 endmodule
