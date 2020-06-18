@@ -258,7 +258,7 @@ module MIPS_Pipeline(
         .result(ALU_result),
         .Zero(Zero_EX)
     );
-    Iter4Multiplier multiplier(
+    BoothMultiplier multiplier(
         .clk(clk),
         .rst_n(rst_n),
         .in_valid(mult_in_valid),
