@@ -7,7 +7,6 @@ module HazardDetection(
     if_id_Write,
     mux_Ctrl
 );
-//==== io Declaration =========================
     input            id_ex_MemRead;
     input      [4:0] id_ex_rt, if_id_rs, if_id_rt;
     output reg       PCWrite, if_id_Write;
@@ -33,26 +32,33 @@ endmodule
 
 module ForwardUnit(
     ex_mem_rd,
+    ex_mem_rt,
     mem_wb_rd,
+    if_id_rs,
+    if_id_rt,
     id_ex_rs,
     id_ex_rt,
     ex_mem_RegWrite,
     mem_wb_RegWrite,
+    ex_mem_MemWrite,
+    opcode_ID,
     ForwardA,
-    ForwardB
+    ForwardB,
+    ForwardWriteData_MEM
 );
-
-input      [4:0] ex_mem_rd, mem_wb_rd, id_ex_rs, id_ex_rt;
-input            ex_mem_RegWrite, mem_wb_RegWrite;
-output reg [1:0] ForwardA, ForwardB; //00 original, 01 forward from mem/wb, 10 forward from ex/mem
+    input      [4:0] ex_mem_rd, ex_mem_rt, mem_wb_rd, if_id_rs, if_id_rt, id_ex_rs, id_ex_rt;
+    input            ex_mem_RegWrite, mem_wb_RegWrite;
+    input            ex_mem_MemWrite;
+    input      [5:0] opcode_ID;
+    output reg [1:0] ForwardA, ForwardB; //00 original, 01 forward from mem/wb, 10 forward from ex/mem
+    output reg       ForwardWriteData_MEM;
 
     always @(*) begin
         ForwardA = 2'b0;
         ForwardB = 2'b0;
 
         if (mem_wb_RegWrite && (mem_wb_rd != 5'd0) && (mem_wb_rd == id_ex_rs) &&
-        !(ex_mem_RegWrite && (ex_mem_rd != 5'd0) && (ex_mem_rd == id_ex_rs))) 
-        begin
+            !(ex_mem_RegWrite && (ex_mem_rd != 5'd0) && (ex_mem_rd == id_ex_rs))) begin
             ForwardA = 2'b01;   //forward from mem/wb
         end 
         else if (ex_mem_RegWrite && (ex_mem_rd != 5'd0) && (ex_mem_rd == id_ex_rs)) begin
@@ -61,8 +67,7 @@ output reg [1:0] ForwardA, ForwardB; //00 original, 01 forward from mem/wb, 10 f
         else ForwardA = 2'b00;  //original
 
         if (mem_wb_RegWrite && (mem_wb_rd != 5'd0) && (mem_wb_rd == id_ex_rt) &&
-        !(ex_mem_RegWrite && (ex_mem_rd != 5'd0) && (ex_mem_rd == id_ex_rt))) 
-        begin
+            !(ex_mem_RegWrite && (ex_mem_rd != 5'd0) && (ex_mem_rd == id_ex_rt))) begin
             ForwardB = 2'b01;   //forward from mem/wb
         end
         else if (ex_mem_RegWrite && (ex_mem_rd != 5'd0) && (ex_mem_rd == id_ex_rt)) begin
@@ -71,4 +76,15 @@ output reg [1:0] ForwardA, ForwardB; //00 original, 01 forward from mem/wb, 10 f
         end
         else ForwardB = 2'b00;  //original
     end
+
+    always @(*) begin
+        ForwardWriteData_MEM = 1'b0;
+
+        if (mem_wb_RegWrite && ex_mem_MemWrite && (mem_wb_rd != 5'd0) && (mem_wb_rd == ex_mem_rt)) begin
+            //deal with save hazard
+            ForwardWriteData_MEM = 1'b1;
+        end
+        else ForwardWriteData_MEM = 1'b0;
+    end
+
 endmodule

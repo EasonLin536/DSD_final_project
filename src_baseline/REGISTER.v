@@ -139,7 +139,7 @@ module REGISTER(
             31:ReadData2 = Registers[31];
             default: ReadData2 = 0;
         endcase
-        if (WriteReg == ReadReg1 && RegWrite) ReadData1 = WriteData;
-        if (WriteReg == ReadReg2 && RegWrite) ReadData2 = WriteData;
+        if (WriteReg == ReadReg1 && RegWrite && ReadReg1 != 0) ReadData1 = WriteData;
+        if (WriteReg == ReadReg2 && RegWrite && ReadReg2 != 0) ReadData2 = WriteData;
     end
 endmodule

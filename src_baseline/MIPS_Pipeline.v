@@ -64,6 +64,7 @@ module MIPS_Pipeline(
     reg   [4:0] instr_2_EX;
     wire  [4:0] instr_3_ID;
     reg   [4:0] instr_3_EX;
+    reg   [4:0] instr_3_MEM;
     wire  [4:0] instr_4_ID;
     reg   [4:0] instr_4_EX;
     wire [15:0] instr_5_ID;
@@ -155,6 +156,7 @@ module MIPS_Pipeline(
     wire  [4:0] instr_2_EX_old;
     wire  [4:0] instr_3_EX_old;
     wire  [4:0] instr_4_EX_old;
+    wire  [4:0] instr_3_MEM_old;
     // Register input
     wire  [4:0] WriteFromInstr_MEM_old, WriteFromInstr_WB_old;
 
@@ -202,6 +204,7 @@ module MIPS_Pipeline(
     wire        ctrl_flush;
 
     wire  [1:0] ForwardA, ForwardB;
+    wire        ForwardWriteData_MEM;
 
 //==== Submodule Connection ===================
     CONTROL control_1(
@@ -365,6 +368,7 @@ module MIPS_Pipeline(
             ALU_result_MEM     <= 0;
             ReadData2_MEM      <= 0;
             WriteFromInstr_MEM <= 0;
+            instr_3_MEM        <= 0;
         end
         else if (ICACHE_stall | DCACHE_stall) begin
             PC_MEM             <= PC_MEM_old;
@@ -383,6 +387,7 @@ module MIPS_Pipeline(
             ALU_result_MEM     <= ALU_result_MEM_old;
             ReadData2_MEM      <= ReadData2_MEM_old;
             WriteFromInstr_MEM <= WriteFromInstr_MEM_old;
+            instr_3_MEM        <= instr_3_MEM_old;
         end
         else begin
             PC_MEM             <= PC_EX;
@@ -401,6 +406,7 @@ module MIPS_Pipeline(
             ALU_result_MEM     <= ALU_result_EX;
             ReadData2_MEM      <= ReadData2_EX;
             WriteFromInstr_MEM <= WriteFromInstr_EX;
+            instr_3_MEM        <= instr_3_EX;
         end
     end
     // ==== stage WB  ====
@@ -490,7 +496,8 @@ module MIPS_Pipeline(
     assign PCsrc = Branch_MEM & Zero_MEM;
     // Data Memory input
     assign DCACHE_addr  = ALU_result_MEM[31:2];
-    assign DCACHE_wdata = ReadData2_MEM;
+    // assign DCACHE_wdata = ReadData2_MEM;
+    assign DCACHE_wdata = (ForwardWriteData_MEM)? WriteData : ReadData2_MEM;
     assign DCACHE_wen   = MemWrite_MEM;
     assign DCACHE_ren   = MemRead_MEM;
     assign rdata_D_MEM  = DCACHE_rdata;
@@ -571,13 +578,20 @@ module MIPS_Pipeline(
 
    ForwardUnit ForwardUnit_1(
         .ex_mem_rd(WriteFromInstr_MEM),
+        .ex_mem_rt(instr_3_MEM),
         .mem_wb_rd(WriteReg),
+        .if_id_rs(instr_2_ID),
+        .if_id_rt(instr_3_ID),
         .id_ex_rs(instr_2_EX),
         .id_ex_rt(instr_3_EX),
         .ex_mem_RegWrite(RegWrite_MEM),
         .mem_wb_RegWrite(RegWrite_WB),
+        .ex_mem_MemWrite(MemWrite_MEM),
+        //.Branch_ID(Branch_ID),
+        .opcode_ID(instr_1_ID),
         .ForwardA(ForwardA),
-        .ForwardB(ForwardB)
+        .ForwardB(ForwardB),
+        .ForwardWriteData_MEM(ForwardWriteData_MEM)
     );
 
 endmodule

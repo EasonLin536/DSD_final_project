@@ -413,7 +413,7 @@ module MIPS_Pipeline(
             ALU_result_MEM     <= 0;
             ReadData2_MEM      <= 0;
             WriteFromInstr_MEM <= 0;
-            instr_3_MEM         <= 0;
+            instr_3_MEM        <= 0;
         end
         else if (ICACHE_stall | DCACHE_stall | mult_stall | div_stall) begin
             PC_MEM             <= PC_MEM_old;
