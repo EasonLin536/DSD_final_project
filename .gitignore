@@ -8,3 +8,4 @@ files_BrPred.f
 files_MultDiv.f
 Iter*_mult.v
 *.tcl
+*.sh

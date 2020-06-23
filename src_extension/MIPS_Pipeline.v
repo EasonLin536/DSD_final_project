@@ -217,9 +217,11 @@ module MIPS_Pipeline(
     wire        ForwardWriteData_MEM;
     // === Branch Prediction ===
     wire        stall;
-    wire        PreWrong;
+    wire  [1:0] PreWrong;
     wire  [5:0] opcode_IF;
-    wire        BrPre;
+    wire        BrPre_IF;
+    wire        BrPre_ID_old;
+    reg         BrPre_ID;
     wire [31:0] ReadData1_forwarded_ID, ReadData2_forwarded_ID;
     wire        equal;
 
@@ -297,23 +299,26 @@ module MIPS_Pipeline(
     end
     // ==== stage ID  ====
     always @(posedge clk) begin
-        if (!rst_n | ((Jump_ID | JumpReg_EX | PreWrong) & ~(ICACHE_stall | DCACHE_stall | mult_stall | div_stall))) begin
+        if (!rst_n | ((Jump_ID | JumpReg_EX | ((PreWrong == 2'b01) || (PreWrong == 2'b11))) & ~(ICACHE_stall | DCACHE_stall | mult_stall | div_stall))) begin
             PC_ID          <= 0;
             PC_plus4_ID    <= 0;
             instruction_ID <= 0;
             PC_add_imm_ID  <= 0;
+            BrPre_ID       <= 0;
         end
         else if (ICACHE_stall | DCACHE_stall | ~IF_ID_write | mult_stall | div_stall) begin
             PC_ID          <= PC_ID_old;
             PC_plus4_ID    <= PC_plus4_ID_old;
             instruction_ID <= instruction_ID_old;
             PC_add_imm_ID  <= PC_add_imm_ID_old;
+            BrPre_ID       <= BrPre_ID_old;
         end
         else begin
             PC_ID          <= PC_r;
             PC_plus4_ID    <= PC_plus4_IF;
             instruction_ID <= instruction_IF;
             PC_add_imm_ID  <= PC_add_imm_IF;
+            BrPre_ID       <= BrPre_IF;
         end
     end
     // ==== stage EX  ====
@@ -495,11 +500,11 @@ module MIPS_Pipeline(
     // PC wire
     assign PC_plus4_IF = PC_r + 4;
     assign jump_addr   = { PC_plus4_ID[31:28], instr_0_ID, 2'b00 };
-    assign miss_addr   = (|(Branch_ID))? PC_add_imm_ID : PC_plus4_ID;
-    assign if_jump     = (Jump_ID)? jump_addr : PC_plus4_IF; // MUX
+    assign miss_addr   = (PreWrong == 2'b11)? PC_add_imm_ID : PC_plus4_ID;
+    assign if_branch   = (BrPre_IF)? PC_add_imm_IF : PC_plus4_IF; // MUX
+    assign if_jump     = (Jump_ID)? jump_addr : if_branch; // MUX
     assign if_jr       = (JumpReg_EX)? alu_in_0 : if_jump; // MUX
-    assign if_branch   = (BrPre)? PC_add_imm_IF : if_jr; // MUX
-    assign if_miss     = (PreWrong)? miss_addr : if_branch; // MUX
+    assign if_miss     = ((PreWrong==2'b01) || (PreWrong == 2'b11))? miss_addr : if_jr; // MUX
     assign PC_w        = (ICACHE_stall | DCACHE_stall | ~PCWrite)? PC_r : if_miss;
 	// Instruction Fetch
 	assign ICACHE_ren     = 1'b1;
@@ -578,6 +583,7 @@ module MIPS_Pipeline(
     assign PC_plus4_ID_old    = PC_plus4_ID;
     assign instruction_ID_old = instruction_ID;
     assign PC_add_imm_ID_old  = PC_add_imm_ID;
+    assign BrPre_ID_old       = BrPre_ID;
     // ==== stage EX  ====
     assign PC_EX_old          = PC_EX;
     assign instruction_EX_old = instruction_EX;
@@ -667,11 +673,11 @@ module MIPS_Pipeline(
         .stall(stall),
         .PreWrong(PreWrong),
         .opcode(opcode_IF),
-        .BrPre(BrPre)
+        .BrPre(BrPre_IF)
     );
 
     Comparater Comparater_1(  
-        .BrPre(BrPre),
+        .BrPre(BrPre_ID),
         .equal(equal),
         .Ctrl_Br(Branch_ID),
         .PreWrong(PreWrong)
