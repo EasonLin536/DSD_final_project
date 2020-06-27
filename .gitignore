@@ -4,6 +4,7 @@ Div_tb.v
 python/
 src_MultDiv/
 src_BrPred/
+src_L2Cache/
 files_BrPred.f
 files_MultDiv.f
 Iter*_mult.v
