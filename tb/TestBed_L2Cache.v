@@ -80,7 +80,7 @@ module	TestBed(
 						end
 		state_check:	begin
 							nxtduration = duration + 1;
-							nxtaddr = curaddr;						
+							nxtaddr = curaddr;
 							nxt_error_num = error_num;	
 							if( addr==`TestPort && wen && state==0 )
 							begin

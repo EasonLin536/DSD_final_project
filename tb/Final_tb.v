@@ -23,7 +23,9 @@
 `endif
 `ifdef L2Cache
 	`define IMEM_INIT "./pattern/I_mem_L2Cache"
+	// `define IMEM_INIT "./pattern/L2CacheExp/nb5incre1/I_mem_L2Cache"
 	`include "./tb/TestBed_L2Cache.v"
+	// `include "./pattern/L2CacheExp/nb5incre1/TestBed_L2Cache.v"
 `endif
 `ifdef MultDiv
 	`define IMEM_INIT "./pattern/I_mem_MultDiv"
@@ -55,7 +57,10 @@ module Final_tb;
 	
 	wire [7:0] error_num;
 	wire [15:0] duration;
-	wire finish;	
+	wire finish;
+
+	// for experiments
+	integer mem_cycle, mem_D_access, mem_I_access;
 
 	// Note the design is connected at testbench, include:
 	// 1. CHIP (MIPS + D_cache + I_chache)
@@ -121,6 +126,11 @@ module Final_tb;
 	
 // Initialize the data memory
 	initial begin
+		// for experiments
+		mem_cycle = 0;
+		mem_D_access = 0;
+		mem_I_access = 0;
+
 		$display("-----------------------------------------------------\n");
 	 	$display("START!!! Simulation Start .....\n");
 	 	$display("-----------------------------------------------------\n");
@@ -139,7 +149,7 @@ module Final_tb;
 		#(`CYCLE*0.2) rst_n = 1'b0;
 		#(`CYCLE*8.5) rst_n = 1'b1;
      
-		#(`CYCLE*10000) // calculate clock cycles for all operation (you can modify it)
+		#(`CYCLE*1000000) // calculate clock cycles for all operation (you can modify it)
 		$display("============================================================================");
 		$display("\n           Error!!! There is something wrong with your code ...!          ");
 		$display("\n                       The test result is .....FAIL                     \n");
@@ -154,7 +164,27 @@ module Final_tb;
 	always #(`CYCLE*0.5) clk = ~clk;
 	
 	always@(finish)
-	    if(finish)
-	       #(`CYCLE) $finish;		   
+	    if(finish) begin
+			$display("============================================================================");
+			$display("\ntotal memory access cycle: %d", mem_cycle);
+			$display("total D_mem access: %d", mem_D_access);
+			$display("total I_mem access: %d\n", mem_I_access);
+			$display("============================================================================");
+		    #(`CYCLE) $finish;		   
+		end
 	
+	// for experiments
+	always @(posedge clk) begin
+		if (mem_read_I | mem_read_D | mem_write_D)
+			mem_cycle = mem_cycle + 1;
+	end
+	always @(posedge clk) begin
+		if (mem_ready_I)
+			mem_I_access = mem_I_access + 1;
+	end
+	always @(posedge clk) begin
+		if (mem_ready_D)
+			mem_D_access = mem_D_access + 1;
+	end
+
 endmodule

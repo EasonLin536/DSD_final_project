@@ -1,0 +1,10 @@
+./tb/Final_tb.v
+./src_baseline/CHIP.v
+./tb/slow_memory.v
+./src_baseline/HandleHazard.v
+./src_baseline/MIPS_Pipeline.v
+./src_baseline/cache.v
+./src_baseline/ALU.v
+./src_baseline/ALU_CONTROL.v
+./src_baseline/CONTROL.v
+./src_baseline/REGISTER.v
