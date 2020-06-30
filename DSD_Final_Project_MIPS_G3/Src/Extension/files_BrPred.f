@@ -1,0 +1,9 @@
+./BrPred/rtl/CHIP.v
+./BrPred/rtl/HandleHazard.v
+./BrPred/rtl/MIPS_Pipeline.v
+./BrPred/rtl/cache.v
+./BrPred/rtl/ALU.v
+./BrPred/rtl/ALU_CONTROL.v
+./BrPred/rtl/CONTROL.v
+./BrPred/rtl/REGISTER.v
+./BrPred/rtl/BrPred.v

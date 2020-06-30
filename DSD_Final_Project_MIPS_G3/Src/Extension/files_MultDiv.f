@@ -1,0 +1,10 @@
+./MultDiv/rtl/CHIP.v
+./MultDiv/rtl/HandleHazard.v
+./MultDiv/rtl/MIPS_Pipeline.v
+./MultDiv/rtl/cache.v
+./MultDiv/rtl/ALU.v
+./MultDiv/rtl/ALU_CONTROL.v
+./MultDiv/rtl/CONTROL.v
+./MultDiv/rtl/REGISTER.v
+./MultDiv/rtl/Booth_mult.v
+./MultDiv/rtl/Iter_div.v
