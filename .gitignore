@@ -10,3 +10,7 @@ Iter*_mult.v
 *.sh
 log/
 L2_unified.v
+*.zip
+./files_BrPred.f
+./files_L2Cache.f
+./files_MultDiv.f

@@ -3,5 +3,5 @@
 ## Usage
 
 ```bash
-ncverilog -f files.f +define+[condition] +access+r
+ncverilog -f files_[condition].f +define+[condition] +access+r
 ```
